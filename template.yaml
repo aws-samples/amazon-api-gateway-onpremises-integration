@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  Builds a VPC wtih 2 private subnets, security groups, policies, VPC Endpoint, a private API Gateway and a Route53
+  inbound resolver.
+Parameters:
+  apiName:
+    Default: privateAPIBlogDemo
+    Description: Friendly name for your API Gateway
+    Type: String
+  onPremCIDR:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 172.31.0.0/16
+    Description: Your On-Premises CIDR Block (eg 172.31.0.0/16), You can add more entries in the prefix list resource
+    Type: String
+Globals:
+  Api:
+    OpenApiVersion: 3.0.1
+Resources:
+  OnPremisesPrefixList:
+    Type: AWS::EC2::PrefixList
+    Properties:
+      PrefixListName: "corporate-network-CIDRs"
+      AddressFamily: "IPv4"
+      MaxEntries: 10
+      Entries:
+        - Cidr: !Ref onPremCIDR
+          Description: "IT Network 1"
+      Tags:
+        - Key: "Name"
+          Value: "IT Network 1-Servers"
+  MyVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+        - Key: Name
+          Value: PrivateAPIBlogDemo
+  privateSubnet01:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.0.0/17
+      AvailabilityZone: !Select 
+        - '0'
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      Tags:
+        - Key: SubnetType
+          Value: Private
+        - Key: Name
+          Value: PrivateAPIBlogDemo
+  privateSubnet02:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.128.0/17
+      AvailabilityZone: !Select 
+        - '1'
+        - !GetAZs 
+          Ref: 'AWS::Region'
+      Tags:
+        - Key: SubnetType
+          Value: Private
+        - Key: Name
+          Value: PrivateAPIBlogDemo
+  ResolverSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref MyVPC
+      GroupDescription: SG for Route53 Resolver endpoint
+      Tags:
+        - Key: Name
+          Value: ResolverSG  
+  ResolverSGIngressTCP:  
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      IpProtocol: tcp
+      FromPort: '53'
+      ToPort: '53'
+      SourcePrefixListId: !Ref OnPremisesPrefixList
+      Description: Allows DNS access from on-premises CIDR
+      GroupId: !GetAtt ResolverSG.GroupId
+  ResolverSGIngressUDP:  
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      IpProtocol: udp
+      FromPort: '53'
+      ToPort: '53'
+      SourcePrefixListId: !Ref OnPremisesPrefixList
+      Description: Allows DNS access from on-premises CIDR
+      GroupId: !GetAtt ResolverSG.GroupId      
+  ResolverSGEgressTCP:  
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:  
+      IpProtocol: tcp
+      FromPort: '0'
+      ToPort: '65535'
+      DestinationPrefixListId: !Ref OnPremisesPrefixList
+      Description: Restricts DNS responses to on-premises CIDR only
+      GroupId: !GetAtt ResolverSG.GroupId
+  ResolverSGEgressUDP:  
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:  
+      IpProtocol: udp
+      FromPort: '0'
+      ToPort: '65535'
+      DestinationPrefixListId: !Ref OnPremisesPrefixList
+      Description: Restricts DNS responses to on-premises CIDR only
+      GroupId: !GetAtt ResolverSG.GroupId      
+  Route53Resolver:
+    Type: 'AWS::Route53Resolver::ResolverEndpoint'
+    Properties:
+      Direction: Inbound
+      IpAddresses:
+        - SubnetId: !Ref privateSubnet01
+        - SubnetId: !Ref privateSubnet02
+      Name: MyInboundEndpoint
+      SecurityGroupIds:
+        - !Ref ResolverSG
+      Tags:
+        - Key: Name
+          Value: PrivateAPIBlogDemo
+  VPCEndpointSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref MyVPC
+      GroupDescription: SG for API Gateway Private endpoint
+      Tags:
+        - Key: Name
+          Value: VPCEndpointSG
+  VPCEndpointSGIngress:  
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      IpProtocol: tcp
+      FromPort: '443'
+      ToPort: '443'
+      SourcePrefixListId: !Ref OnPremisesPrefixList
+      Description: Allows HTTPS access from on-premises CIDR to API Gateway endpoint
+      GroupId: !GetAtt VPCEndpointSG.GroupId
+  VPCEndpointSGEgress:  
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:  
+      IpProtocol: tcp
+      FromPort: '0'
+      ToPort: '65535'
+      DestinationPrefixListId: !Ref OnPremisesPrefixList
+      Description: Restricts HTTPS responses to on-premises CIDR only
+      GroupId: !GetAtt VPCEndpointSG.GroupId
+  APIGWVPCEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: 'execute-api:Invoke'
+            Effect: Allow
+            Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*'
+            Principal: '*'
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.execute-api'
+      SubnetIds:
+        - !Ref privateSubnet01
+        - !Ref privateSubnet02
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref VPCEndpointSG
+      VpcId: !Ref MyVPC
+  MyRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Description: API GW Blog Demo
+      EndpointConfiguration: 
+        Type: PRIVATE
+        VPCEndpointIds:
+          - !Ref APIGWVPCEndpoint
+      Name: !Ref apiName
+      StageName: DemoStage
+      Auth:
+        ResourcePolicy:
+          IntrinsicVpceWhitelist:
+            - !Ref APIGWVPCEndpoint
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: hello_world/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.7
+      Events:
+        HelloWorldApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyRestApi
+            Path: /hello
+            Method: GET
+Outputs:
+  ResolverEndpoint:
+    Description: Route53 Inbound resolver ID
+    Value: !GetAtt Route53Resolver.ResolverEndpointId
+  APIInvokeURL:
+    Description: API Gateway URL, invoke with curl from on premises client. 
+    Value: !Sub 'https://${MyRestApi}.execute-api.${AWS::Region}.amazonaws.com/DemoStage/hello'
