@@ -1,11 +1,35 @@
-## My Project
+## Integrating Amazon API Gateway private endpoints with on-premises networks
 
-TODO: Fill this README out!
+Read the blog about this application:
+[Integrating Amazon API Gateway private endpoints with on-premises networks](https://aws.amazon.com/blogs/compute/)
 
-Be sure to:
 
-* Change the title in this README
-* Edit your repository description on GitHub
+### Requirements for deployment
+
+* <a href="https://aws.amazon.com/cli/" target="_blank">AWS CLI</a>
+* <a href="https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html" target="_blank">AWS SAM CLI</a>
+
+### Deploying
+
+In the terminal, use the SAM CLI guided deployment the first time you deploy
+
+1.	Navigate to the repository,	Alternatively use sam init command and paste the repo URL.
+ 
+3.	Build the AWS SAM application:
+```bash
+sam build
+```
+4.	Deploy the AWS SAM application:
+```bash
+sam deploy –guided
+```
+
+## Cleanup
+1. Open the <a href="https://console.aws.amazon.com/cloudformation/home" target="_blank">CloudFormation console</a>
+1. Locate the stack using the name entered in SAM deployment.
+1. Select the radio option next to it
+1. Select **Delete**
+1. Select **Delete stack** to confirm
 
 ## Security
 
