@@ -8,12 +8,15 @@ Read the blog about this application:
 
 * <a href="https://aws.amazon.com/cli/" target="_blank">AWS CLI</a>
 * <a href="https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html" target="_blank">AWS SAM CLI</a>
+* AWS credentials that provide the necessary permissions to create the resources. This example uses admin credentials.
+* Amazon VPN or AWS Direct Connect with routing rules that allow DNS traffic to pass through to the Amazon VPC.
+
 
 ### Deploying
 
 In the terminal, use the SAM CLI guided deployment the first time you deploy
 
-1.	Navigate to the repository,	Alternatively use sam init command and paste the repo URL.
+1. Navigate to the cloned repo directory. Alternatively, use the sam init command and paste the repo URL.
  
 3.	Build the AWS SAM application:
 ```bash
