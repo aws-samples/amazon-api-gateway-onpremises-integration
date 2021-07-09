@@ -1,7 +1,7 @@
 ## Integrating Amazon API Gateway private endpoints with on-premises networks
 
 Read the blog about this application:
-[Integrating Amazon API Gateway private endpoints with on-premises networks](https://aws.amazon.com/blogs/compute/)
+[Integrating Amazon API Gateway private endpoints with on-premises networks](https://aws.amazon.com/blogs/compute/integrating-amazon-api-gateway-private-endpoints-with-on-premises-networks/)
 
 
 ### Requirements for deployment
